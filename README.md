@@ -5,397 +5,276 @@ Automated job preparation and execution tools for Schrodinger software on univer
 ## 🚀 Quick Start
 
 ### Prerequisites
-- Access to a Linux server with Schrodinger installed
-- SSH access to the server
-- Basic command line knowledge
+- Linux server with Schrodinger installed
+- SSH access and basic command line knowledge
 
 ### Setup (First Time Only)
 
-1. **Upload the scripts** to your home directory on the server:
+1. **Upload scripts** to your home directory:
    ```bash
-   scp setup_schrodinger.sh prep_jobs.sh glide_grid_prep_jobs.sh config.json.example username@server:~/
+   scp *.sh config.json.example username@server:~/
    ```
 
-2. **Create your configuration file**:
+2. **Create configuration**:
    ```bash
    cp config.json.example ~/config.json
+   nano ~/config.json  # Edit with your server's paths
    ```
 
-3. **Install jq** (if not already available):
+3. **Install jq** (if needed):
    ```bash
-   sudo yum install jq    # For RHEL/CentOS
-   # OR
-   sudo apt install jq    # For Ubuntu/Debian
+   sudo yum install jq    # RHEL/CentOS
+   sudo apt install jq    # Ubuntu/Debian
    ```
 
-4. **Edit the configuration** with your server's settings:
+4. **Make executable and test**:
    ```bash
-   nano ~/config.json
-   ```
-   **IMPORTANT:** You must update the paths and license file name for your specific server! See [Configuration Setup](#-configuration-setup) below.
-
-5. **Make scripts executable**:
-   ```bash
-   chmod +x setup_schrodinger.sh prep_jobs.sh glide_grid_prep_jobs.sh
-   ```
-
-6. **Test Schrodinger environment**:
-   ```bash
+   chmod +x *.sh
    source setup_schrodinger.sh
    ```
 
 ## 📁 Directory Structure
 
-Create your jobs in the following structure:
 ```
-~/jobs/
-├── job1_name/
-│   ├── job1_name.sh          # Your job script
-│   ├── job1_name.in          # Input file
-│   └── other_files...
-├── job2_name/
-│   ├── job2_name.sh
-│   ├── job2_name.in
-│   └── other_files...
-└── ...
+~/
+├── jobs/              # Job directories (auto-created)
+├── ligands/           # Ligand files for docking (.sdf, .mol, .mol2, .mae)
+├── grids/             # Grid files for docking (.zip, .grd)
+├── config.json        # Your configuration
+└── *.sh               # Automation scripts
 ```
 
-**Important:** Each job directory must contain exactly one `.sh` script file.
+**Job structure:**
+```
+~/jobs/job_name/
+├── job_name.sh        # Execution script
+├── job_name.in        # Input file
+└── other_files...
+```
 
 ## ⚙️ Configuration Setup
 
-### Finding Your Server's Settings
+Find your server's settings and update `~/config.json`:
 
-Before using the tools, you need to configure them for your specific server. The configuration file `config.json` contains all server-specific paths and settings in a clean JSON format.
-
-#### 1. Find Schrodinger Installation Path
-```bash
-# Method 1: Search for glide executable
-find /opt /usr/local -name "glide" 2>/dev/null | head -1 | xargs dirname
-
-# Method 2: Check common locations
-ls -d /opt/schrodinger* /usr/local/schrodinger* 2>/dev/null
-
-# Method 3: Ask your system administrator
-```
-
-#### 2. Find License Directory and File
-```bash
-# Find license files on the system
-find /opt -name "*.lic" 2>/dev/null
-
-# Common license locations
-ls /opt/schrodinger/licenses/*.lic 2>/dev/null
-ls /opt/schrodinger*/licenses/*.lic 2>/dev/null
-```
-
-#### 3. Example Configuration
-
-Your `~/config.json` should look like:
 ```json
 {
   "schrodinger": {
     "installation_path": "/opt/schrodinger2025-1",
-    "license_path": "/opt/schrodinger/licenses",
-    "license_file": "UNIVERSITY_LICENSE_12345.serverid.lic"
+    "license_path": "/opt/schrodinger/licenses", 
+    "license_file": "YOUR_LICENSE.serverid.lic"
   },
   "jobs": {
     "directory": "jobs",
-    "timeout": 3600,
-    "check_interval": 30,
-    "progress_interval": 300
+    "timeout": 3600
+  },
+  "ligands": {
+    "directory": "ligands",
+    "supported_formats": [".sdf", ".mol", ".mol2", ".mae"]
+  },
+  "grids": {
+    "directory": "grids", 
+    "supported_formats": [".zip", ".grd"]
+  },
+  "docking": {
+    "precision": "SP",
+    "poses_per_ligand": 1,
+    "pose_output_type": "poseviewer",
+    "default_host": "batch-small"
   }
 }
 ```
 
-#### 4. What Each Setting Means
-
-| Setting | Description | How to Find |
-|---------|-------------|-------------|
-| `installation_path` | Directory containing Schrodinger executables | Search for `glide` executable |
-| `license_path` | Directory containing license files | Search for `*.lic` files |
-| `license_file` | Your specific license file name | List `.lic` files in license directory |
-| `timeout` | Max time to wait for job completion (seconds) | Usually 3600 (1 hour) is good |
-| `directory` | Name of jobs folder in your home directory | Default "jobs" works for most users |
-
-#### 5. Validation
-
-After configuration, test with:
+**Find paths:**
 ```bash
-source setup_schrodinger.sh
+# Schrodinger installation
+find /opt /usr/local -name "glide" 2>/dev/null | head -1 | xargs dirname
+
+# License files
+find /opt -name "*.lic" 2>/dev/null
 ```
-
-This will validate all your settings and show helpful error messages if anything is wrong.
-
-### Security Note
-
-⚠️ **NEVER commit your actual `config.json` to git!** It contains server-specific information that shouldn't be shared. The `.gitignore` file already excludes it.
 
 ## 🛠️ Tools Overview
 
 ### 1. `setup_schrodinger.sh`
-Sets up the Schrodinger environment with proper paths and license configuration using your `schrodinger_config.conf` file.
-
-**Features:**
-- ✅ Loads configuration from `~/config.json`
-- ✅ Validates all paths and license files
-- ✅ Sets up environment variables properly
-- ✅ Tests license connectivity
-- ✅ Shows helpful error messages with troubleshooting tips
-- ✅ Requires `jq` for JSON parsing (auto-detected)
-
-**Usage:**
+Environment setup with configuration validation.
 ```bash
 source setup_schrodinger.sh
 ```
 
 ### 2. `prep_jobs.sh` 
-General job preparation for any Schrodinger jobs with configurable settings.
-
-**Features:**
-- ✅ Uses job timeout and directories from config file
-- ✅ Works with any Schrodinger job type
-- ✅ Configurable completion checking intervals
-
-**Usage:**
+General Schrodinger job preparation.
 ```bash
 ./prep_jobs.sh
 ```
 
 ### 3. `glide_grid_prep_jobs.sh`
-Specialized tool for Glide grid generation jobs with automatic issue fixing and configuration support.
-
-**Features:**
-- ✅ Automatically removes `-elements` flags (fixes license issues)
-- ✅ Detects Glide grid jobs vs docking jobs
-- ✅ Enhanced validation for grid generation
-- ✅ Uses configurable timeouts and settings
-- ✅ Fallback to defaults if no config file
-
-**Usage:**
+Glide grid generation with automatic license fix (removes `-elements` flags).
 ```bash
 ./glide_grid_prep_jobs.sh
 ```
 
-## 🎯 How to Use
-
-### Step 1: Prepare Your Jobs
+### 4. `glide_docking_prep_jobs.sh` ⭐ **NEW**
+Automated ligand-receptor docking from JSON input.
 ```bash
-# For general Schrodinger jobs:
-./prep_jobs.sh
+./glide_docking_prep_jobs.sh docking_combinations.json
+```
 
-# For Glide grid generation specifically:
+## 🎯 Workflows
+
+### Grid Generation
+```bash
 ./glide_grid_prep_jobs.sh
+source run-glide-grid-jobs_YYMMDD-HHMM.sh
 ```
 
-This will:
-- Validate all job directories
-- Fix known issues automatically
-- Generate a timestamped runner script (e.g., `run-jobs_250527-1430.sh`)
+### Docking Workflow ⭐ **NEW**
 
-### Step 2: Run Your Jobs
-```bash
-# Execute the generated runner script
-source run-jobs_YYMMDD-HHMM.sh
-```
-
-**Example output:**
-```
-Starting Glide grid job 1 of 2: MyProtein_grid_generation
-  → Directory: /home/user/jobs/MyProtein_grid_generation
-  → Running MyProtein_grid_generation.sh...
-  → Job submitted, waiting for completion...
-✅ Glide grid job completed successfully: MyProtein_grid_generation
-  → Total elapsed time = 120 seconds
-  → Script duration: 125s
-```
-
-## 📤📥 File Transfer with SCP
-
-### Upload Files to Server
-
-**Upload a single file:**
-```bash
-scp local_file.txt username@server:~/jobs/job_name/
-```
-
-**Upload an entire directory:**
-```bash
-scp -r local_job_directory/ username@server:~/jobs/
-```
-
-**Upload multiple files:**
-```bash
-scp file1.in file2.sh file3.mae username@server:~/jobs/job_name/
-```
-
-### Download Results from Server
-
-**Download specific output files:**
-```bash
-scp username@server:~/jobs/job_name/*.zip ~/Downloads/
-scp username@server:~/jobs/job_name/*.log ~/Downloads/
-```
-
-**Download entire job directory:**
-```bash
-scp -r username@server:~/jobs/job_name/ ~/Downloads/
-```
-
-**Download all job results:**
-```bash
-scp -r username@server:~/jobs/ ~/Downloads/all_jobs/
-```
-
-### Useful SCP Tips
-
-**Check what files exist before downloading:**
-```bash
-ssh username@server "ls -la ~/jobs/job_name/"
-```
-
-**Download only completed jobs (with .zip files):**
-```bash
-ssh username@server "find ~/jobs -name '*.zip'" | while read file; do
-    scp username@server:"$file" ~/Downloads/
-done
-```
-
-**Compress before download (for large results):**
-```bash
-ssh username@server "cd ~/jobs && tar -czf results.tar.gz */"
-scp username@server:~/jobs/results.tar.gz ~/Downloads/
-```
-
-## 🔧 Common Issues & Solutions
-
-### Issue: License Errors
-**Problem:** `FATAL ERROR. Failed to check out a license`
-**Solution:** Use `glide_grid_prep_jobs.sh` - it automatically removes problematic `-elements` flags
-
-### Issue: Jobs Not Completing
-**Problem:** Script thinks job failed but it's still running
-**Solution:** Tools now wait for "Exiting Glide" message - be patient, jobs can take 5-30 minutes
-
-### Issue: Permission Denied
-**Problem:** `Permission denied` when running scripts
-**Solution:** 
-```bash
-chmod +x *.sh
-chmod +x ~/jobs/*/*.sh
-```
-
-### Issue: Environment Not Set
-**Problem:** `command not found: glide`
-**Solution:** Always source the environment setup:
-```bash
-source setup_schrodinger.sh
-```
-
-### Issue: Configuration File Not Found
-**Problem:** `Configuration file not found: ~/config.json`
-**Solution:** Create your config file from the example:
-```bash
-cp config.json.example ~/config.json
-nano ~/config.json  # Edit with your server's paths
-```
-
-### Issue: jq Not Available
-**Problem:** `jq is required to parse the JSON config file`
-**Solution:** Install jq:
-```bash
-sudo yum install jq    # For RHEL/CentOS
-sudo apt install jq    # For Ubuntu/Debian
-```
-
-### Issue: Wrong Paths in Config
-**Problem:** `Schrodinger installation not found` or `License file not found`
-**Solution:** Use the detection commands to find correct paths:
-```bash
-# Find Schrodinger installation
-find /opt /usr/local -name "glide" 2>/dev/null
-
-# Find license files  
-find /opt -name "*.lic" 2>/dev/null
-```
-
-## 📋 Example Workflow
-
-1. **Create job directory locally:**
+1. **Prepare ligands and grids:**
    ```bash
-   mkdir MyProtein_grid
-   # Add your .in file and create .sh script
+   mkdir -p ~/ligands ~/grids
+   # Upload your ligand and grid files
    ```
 
-2. **Upload to server:**
-   ```bash
-   scp -r MyProtein_grid/ username@server:~/jobs/
+2. **Create docking combinations JSON:**
+   ```json
+   {
+     "docking_combinations": [
+       {
+         "ligand": "compound_001.sdf",
+         "grid": "receptor_grid.zip", 
+         "job_name": "comp001_docking"
+       },
+       {
+         "ligand": "compound_002.sdf",
+         "grid": "receptor_grid.zip",
+         "job_name": "comp002_docking"
+       }
+     ]
+   }
    ```
 
-3. **SSH to server and setup configuration:**
+3. **Generate and run docking jobs:**
+   ```bash
+   ./glide_docking_prep_jobs.sh my_docking.json
+   source run-glide-docking-jobs_YYMMDD-HHMM.sh
+   ```
+
+## 📤📥 File Transfer
+
+**Upload:**
+```bash
+# Single files
+scp file.sdf username@server:~/ligands/
+scp grid.zip username@server:~/grids/
+
+# Job directories
+scp -r job_dir/ username@server:~/jobs/
+```
+
+**Download results:**
+```bash
+# Specific outputs
+scp username@server:~/jobs/job_name/*.{zip,log,csv} ~/Downloads/
+
+# All jobs
+scp -r username@server:~/jobs/ ~/Downloads/
+```
+
+## 🔧 Common Issues
+
+| Issue | Solution |
+|-------|----------|
+| License errors | Use `glide_grid_prep_jobs.sh` (auto-removes `-elements`) |
+| Permission denied | `chmod +x *.sh` |
+| Command not found | `source setup_schrodinger.sh` |
+| Config not found | `cp config.json.example ~/config.json` |
+| jq not available | `sudo yum install jq` |
+
+## 📋 Example: Complete Docking Workflow
+
+1. **Setup on server:**
    ```bash
    ssh username@server
-   cd ~
-   # Edit your config file with server-specific paths
-   nano config.json
-   # Test the configuration
-   source setup_schrodinger.sh
+   mkdir -p ~/ligands ~/grids
    ```
 
-4. **Prepare jobs:**
+2. **Upload files:**
    ```bash
-   ./glide_grid_prep_jobs.sh
+   scp compounds/*.sdf username@server:~/ligands/
+   scp receptor_grid.zip username@server:~/grids/
    ```
 
-5. **Run jobs:**
+3. **Create docking JSON locally:**
+   ```json
+   {
+     "docking_combinations": [
+       {
+         "ligand": "aspirin.sdf",
+         "grid": "cox2_grid.zip",
+         "job_name": "aspirin_cox2"
+       }
+     ]
+   }
+   ```
+
+4. **Upload and run:**
    ```bash
-   source run-glide-grid-jobs_YYMMDD-HHMM.sh
+   scp docking.json username@server:~/
+   ssh username@server
+   ./glide_docking_prep_jobs.sh docking.json
+   source run-glide-docking-jobs_*.sh
    ```
 
-6. **Download results:**
+5. **Download results:**
    ```bash
-   scp -r username@server:~/jobs/MyProtein_grid/ ~/Downloads/
+   scp -r username@server:~/jobs/aspirin_cox2/ ~/Downloads/
    ```
 
-## 🏗️ Job Script Template
+## 🏗️ Job Script Templates
 
-For Glide grid generation, your `.sh` file should look like:
+**Grid generation:**
 ```bash
 #!/bin/bash
 "${SCHRODINGER}/glide" job_name.in -OVERWRITE -HOST localhost -TMPLAUNCHDIR
 ```
 
-**Note:** The tools automatically remove `-elements` flags if present.
+**Note:** Docking jobs are generated automatically from JSON input.
 
-## 📦 Repository Contents
+## 📦 Generated Files
+
+### Docking Outputs
+- `job_name_raw.maegz` - Raw docked poses
+- `job_name.csv` - Docking scores and results  
+- `job_name.log` - Execution log
+- `job_name_config.json` - Job configuration
 
 ### Scripts
-- `setup_schrodinger.sh` - Environment setup with config file support
-- `prep_jobs.sh` - General job preparation tool
-- `glide_grid_prep_jobs.sh` - Specialized Glide grid job tool
+- `run-*-jobs_YYMMDD-HHMM.sh` - Timestamped job runners
+- Individual job execution scripts in each job directory
+
+## 🎯 Features
+
+✅ **JSON-driven docking setup**  
+✅ **Automatic license issue fixing**  
+✅ **Configurable via JSON**  
+✅ **Multiple output format support**  
+✅ **Comprehensive error handling**  
+✅ **Parallel job execution**  
+✅ **Real-time progress tracking**  
+
+## 📄 Repository Contents
+
+### Scripts
+- `setup_schrodinger.sh` - Environment setup
+- `prep_jobs.sh` - General job preparation  
+- `glide_grid_prep_jobs.sh` - Grid generation
+- `glide_docking_prep_jobs.sh` - **NEW:** Automated docking
 
 ### Configuration
-- `config.json.example` - Example JSON configuration file (COPY AND EDIT THIS)
-- `config.json` - Your actual configuration (excluded from git)
-- `.gitignore` - Excludes sensitive files from git
+- `config.json.example` - Template (copy and edit)
+- `.gitignore` - Excludes sensitive files
 
-### Documentation
-- `README.md` - This documentation
-
-### Important Files NOT in Repository (You Create These)
-- `config.json` - Your actual configuration (contains sensitive paths)
-- `jobs/` - Your job directories  
-- `run-*_*.sh` - Generated job runner scripts
-
-## 🤝 Contributing
-
-Feel free to submit issues and enhancement requests!
-
-**Security Reminder:** Never commit actual configuration files or job data that contains server-specific or sensitive information.
-
-## 📄 License
-
-Open source - use and modify as needed for your research.
+**Note:** `config.json` and `jobs/` directories are excluded from git for security.
 
 ---
 **Created for university research computing environments** 

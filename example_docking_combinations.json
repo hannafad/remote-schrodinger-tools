@@ -1,0 +1,34 @@
+{
+  "docking_combinations": [
+    {
+      "ligand": "compound_001.sdf",
+      "grid": "receptor_grid_1.zip",
+      "job_name": "cmp001_rec1"
+    },
+    {
+      "ligand": "compound_002.sdf", 
+      "grid": "receptor_grid_1.zip",
+      "job_name": "cmp002_rec1"
+    },
+    {
+      "ligand": "compound_003.sdf",
+      "grid": "receptor_grid_1.zip", 
+      "job_name": "cmp003_rec1"
+    },
+    {
+      "ligand": "compound_001.sdf",
+      "grid": "receptor_grid_2.zip",
+      "job_name": "cmp001_rec2"
+    },
+    {
+      "ligand": "compound_002.sdf",
+      "grid": "receptor_grid_2.zip",
+      "job_name": "cmp002_rec2"
+    },
+    {
+      "ligand": "fragment_library.sdf",
+      "grid": "active_site_grid.zip",
+      "job_name": "fragments_active_site"
+    }
+  ]
+} 

@@ -1,5 +1,6 @@
 # Ignore actual configuration files (contain sensitive information)
 config.json
+test_docking.json
 
 # Ignore generated job runner scripts
 run-jobs_*.sh
@@ -8,8 +9,10 @@ run-glide-grid-jobs_*.sh
 # Ignore log files
 *.log
 
-# Ignore job directories (may contain sensitive data)
+# Ignore user's directories (may contain sensitive data)
 jobs/
+ligands/
+grids/
 
 # Ignore temporary files
 *.tmp
