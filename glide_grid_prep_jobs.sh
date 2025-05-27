@@ -143,10 +143,11 @@ process_job_dir() {
 # Function to create the sequential job runner script
 create_runner_script() {
     local valid_jobs=("$@")
+    local total_jobs=${#valid_jobs[@]}
     
     echo "Creating Glide grid job runner: $RUNNER_SCRIPT"
     
-    cat > "$RUNNER_SCRIPT" << 'EOF'
+    cat > "$RUNNER_SCRIPT" << EOF
 #!/bin/bash
 
 # Sequential Glide Grid Job Runner Script
@@ -155,32 +156,32 @@ create_runner_script() {
 
 echo "Sequential Glide Grid Job Runner"
 echo "==============================="
-echo "Generated: $(date)"
+echo "Generated: \$(date)"
 echo ""
 
 # Check and setup Schrodinger environment if needed
 echo "Checking Schrodinger environment..."
-if [ -z "$SCHRODINGER" ] || [ ! -x "$SCHRODINGER/glide" ]; then
+if [ -z "\$SCHRODINGER" ] || [ ! -x "\$SCHRODINGER/glide" ]; then
     echo "Setting up Schrodinger environment..."
-    if [ -f "$HOME/setup_schrodinger.sh" ]; then
-        source "$HOME/setup_schrodinger.sh"
-        if [ -z "$SCHRODINGER" ]; then
+    if [ -f "\$HOME/setup_schrodinger.sh" ]; then
+        source "\$HOME/setup_schrodinger.sh"
+        if [ -z "\$SCHRODINGER" ]; then
             echo "❌ ERROR: Failed to configure Schrodinger environment"
             exit 1
         fi
     else
-        echo "❌ ERROR: setup_schrodinger.sh not found in $HOME"
+        echo "❌ ERROR: setup_schrodinger.sh not found in \$HOME"
         exit 1
     fi
 fi
 
 echo "✅ Schrodinger environment ready"
-echo "✅ SCHRODINGER=$SCHRODINGER"
-echo "✅ SCHRODINGER_LICENSE_FILE=$SCHRODINGER_LICENSE_FILE"
+echo "✅ SCHRODINGER=\$SCHRODINGER"
+echo "✅ SCHRODINGER_LICENSE_FILE=\$SCHRODINGER_LICENSE_FILE"
 echo ""
 
 # Job counter
-total_jobs=${#valid_jobs[@]}
+total_jobs=$total_jobs
 completed_jobs=0
 failed_jobs=0
 
@@ -196,7 +197,7 @@ EOF
         cat >> "$RUNNER_SCRIPT" << EOF
 
 # Glide Grid Job $job_number: $job_name
-echo "Starting Glide grid job $job_number of $total_jobs: $job_name"
+echo "Starting Glide grid job $job_number of \$total_jobs: $job_name"
 echo "  → Directory: $job_dir"
 
 # Change to job directory
@@ -220,9 +221,9 @@ else
     echo "  → Job submitted, waiting for completion..."
     
     # Wait for completion by checking for "Exiting Glide" in log file
-    max_wait=\$JOB_TIMEOUT
+    max_wait=$JOB_TIMEOUT
     elapsed=0
-    check_interval=\$CHECK_INTERVAL
+    check_interval=$CHECK_INTERVAL
     
     while [ \$elapsed -lt \$max_wait ]; do
         if [ -f "$job_name.log" ] && grep -q "Exiting Glide" "$job_name.log" && grep -q "Total elapsed time" "$job_name.log"; then
@@ -247,7 +248,7 @@ else
         elapsed=\$((elapsed + check_interval))
         
         # Progress update based on config
-        if [ \$((elapsed % \$PROGRESS_INTERVAL)) -eq 0 ]; then
+        if [ \$((elapsed % $PROGRESS_INTERVAL)) -eq 0 ]; then
             echo "  → Still waiting... (\${elapsed}s elapsed)"
         fi
     done
