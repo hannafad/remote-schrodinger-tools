@@ -1,0 +1,32 @@
+# Ignore actual configuration files (contain sensitive information)
+config.json
+
+# Ignore generated job runner scripts
+run-jobs_*.sh
+run-glide-grid-jobs_*.sh
+
+# Ignore log files
+*.log
+
+# Ignore job directories (may contain sensitive data)
+jobs/
+
+# Ignore temporary files
+*.tmp
+*.temp
+*~
+
+# Ignore backup files
+*.bak
+*.backup
+
+# Ignore OS-specific files
+.DS_Store
+Thumbs.db
+
+# Ignore editor-specific files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~ 

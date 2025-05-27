@@ -1,0 +1,13 @@
+{
+  "schrodinger": {
+    "installation_path": "/opt/schrodinger2025-1",
+    "license_path": "/opt/schrodinger/licenses",
+    "license_file": "YOUR_LICENSE_FILE.serverid.lic"
+  },
+  "jobs": {
+    "directory": "jobs",
+    "timeout": 3600,
+    "check_interval": 30,
+    "progress_interval": 300
+  }
+} 
