@@ -11,6 +11,7 @@
 # 4. Makes all .sh files executable
 # 5. Generates a sequential job runner script
 # 6. Creates a corresponding log file for tracking
+# 7. Exports completed grids to grids directory and cleans up job directories
 
 # =============================================================================
 # CONFIGURATION LOADING
@@ -21,6 +22,7 @@ CONFIG_FILE="$HOME/config.json"
 # Load configuration if available
 if [ -f "$CONFIG_FILE" ] && command -v jq >/dev/null 2>&1; then
     JOBS_DIRECTORY=$(jq -r '.jobs.directory // "jobs"' "$CONFIG_FILE")
+    GRIDS_DIRECTORY=$(jq -r '.grids.directory // "grids"' "$CONFIG_FILE")
     JOB_TIMEOUT=$(jq -r '.jobs.timeout // 3600' "$CONFIG_FILE")
     CHECK_INTERVAL=$(jq -r '.jobs.check_interval // 30' "$CONFIG_FILE")
     PROGRESS_INTERVAL=$(jq -r '.jobs.progress_interval // 300' "$CONFIG_FILE")
@@ -32,6 +34,7 @@ else
     
     # Set defaults
     JOBS_DIRECTORY="jobs"
+    GRIDS_DIRECTORY="grids"
     JOB_TIMEOUT=3600
     CHECK_INTERVAL=30
     PROGRESS_INTERVAL=300
@@ -42,6 +45,7 @@ fi
 # =============================================================================
 
 JOBS_DIR="$HOME/$JOBS_DIRECTORY"
+GRIDS_DIR="$HOME/$GRIDS_DIRECTORY"
 TIMESTAMP=$(date +%y%m%d-%H%M)
 RUNNER_SCRIPT="run-glide-grid-jobs_${TIMESTAMP}.sh"
 
@@ -153,6 +157,7 @@ create_runner_script() {
 # Sequential Glide Grid Job Runner Script
 # Generated automatically by glide_grid_prep_jobs.sh
 # Simple version with command line output only
+# Includes automatic grid export and job cleanup
 
 echo "Sequential Glide Grid Job Runner"
 echo "==============================="
@@ -180,9 +185,26 @@ echo "✅ SCHRODINGER=\$SCHRODINGER"
 echo "✅ SCHRODINGER_LICENSE_FILE=\$SCHRODINGER_LICENSE_FILE"
 echo ""
 
+# Ensure grids directory exists
+GRIDS_DIR="$GRIDS_DIR"
+if [ ! -d "\$GRIDS_DIR" ]; then
+    echo "Creating grids directory: \$GRIDS_DIR"
+    mkdir -p "\$GRIDS_DIR"
+    if [ \$? -eq 0 ]; then
+        echo "✅ Created grids directory successfully"
+    else
+        echo "❌ ERROR: Failed to create grids directory"
+        exit 1
+    fi
+else
+    echo "✅ Grids directory exists: \$GRIDS_DIR"
+fi
+echo ""
+
 # Job counter
 total_jobs=$total_jobs
 completed_jobs=0
+exported_jobs=0
 failed_jobs=0
 
 EOF
@@ -224,6 +246,7 @@ else
     max_wait=$JOB_TIMEOUT
     elapsed=0
     check_interval=$CHECK_INTERVAL
+    job_completed=false
     
     while [ \$elapsed -lt \$max_wait ]; do
         if [ -f "$job_name.log" ] && grep -q "Exiting Glide" "$job_name.log" && grep -q "Total elapsed time" "$job_name.log"; then
@@ -233,6 +256,7 @@ else
             echo "✅ Glide grid job completed successfully: $job_name"
             echo "  → \$job_elapsed_time"
             echo "  → Script duration: \${duration}s"
+            job_completed=true
             ((completed_jobs++))
             break
         fi
@@ -254,9 +278,54 @@ else
     done
     
     # Check if we timed out
-    if [ \$elapsed -ge \$max_wait ]; then
+    if [ \$elapsed -ge \$max_wait ] && [ "\$job_completed" = "false" ]; then
         echo "❌ Job timed out after \${max_wait}s"
         ((failed_jobs++))
+    fi
+    
+    # If job completed successfully, export grid and cleanup
+    if [ "\$job_completed" = "true" ]; then
+        echo "  → Exporting grid and cleaning up job directory..."
+        
+        # Look for generated grid zip file
+        grid_files=(\$(find . -name "*.zip" -type f))
+        
+        if [ \${#grid_files[@]} -eq 0 ]; then
+            echo "  ❌ ERROR: No grid zip file found - keeping job directory"
+            ((failed_jobs++))
+            ((completed_jobs--))  # Adjust counter since export failed
+        elif [ \${#grid_files[@]} -gt 1 ]; then
+            echo "  ❌ ERROR: Multiple grid zip files found - keeping job directory"
+            printf "     %s\n" "\${grid_files[@]}"
+            ((failed_jobs++))
+            ((completed_jobs--))  # Adjust counter since export failed
+        else
+            grid_file="\${grid_files[0]}"
+            grid_filename=\$(basename "\$grid_file")
+            
+            echo "  → Found grid file: \$grid_filename"
+            echo "  → Moving to grids directory..."
+            
+            # Move grid file to grids directory
+            if mv "\$grid_file" "\$GRIDS_DIR/"; then
+                echo "  ✅ Successfully exported: \$GRIDS_DIR/\$grid_filename"
+                
+                # Remove job directory since export was successful
+                cd "\$HOME" || cd /
+                echo "  → Cleaning up job directory: $job_dir"
+                if rm -rf "$job_dir"; then
+                    echo "  ✅ Successfully removed job directory"
+                    ((exported_jobs++))
+                else
+                    echo "  ⚠️  WARNING: Failed to remove job directory (grid was exported)"
+                    ((exported_jobs++))  # Still count as exported
+                fi
+            else
+                echo "  ❌ ERROR: Failed to move grid file - keeping job directory"
+                ((failed_jobs++))
+                ((completed_jobs--))  # Adjust counter since export failed
+            fi
+        fi
     fi
 fi
 
@@ -273,12 +342,16 @@ EOF
 echo "=== GLIDE GRID JOB RUNNER SUMMARY ==="
 echo "Total jobs: $total_jobs"
 echo "Completed successfully: $completed_jobs"
+echo "Exported and cleaned up: $exported_jobs"
 echo "Failed: $failed_jobs"
 
 if [ $failed_jobs -eq 0 ]; then
-    echo "🎉 All Glide grid jobs completed successfully!"
+    echo "🎉 All Glide grid jobs completed and exported successfully!"
+    echo "✅ All job directories cleaned up"
+    echo "📁 Grids available in: $GRIDS_DIR"
 else
-    echo "⚠️  Some Glide grid jobs failed."
+    echo "⚠️  Some Glide grid jobs failed or could not be exported."
+    echo "📂 Failed job directories remain in: $JOBS_DIR"
 fi
 
 EOF
@@ -296,6 +369,7 @@ echo "Glide Grid Job Preparation Script"
 echo "================================="
 echo "Specialized for Glide grid generation jobs"
 echo "Processing jobs in: $JOBS_DIR"
+echo "Grids will be exported to: $GRIDS_DIR"
 echo "Timestamp: $TIMESTAMP"
 echo ""
 
@@ -351,6 +425,10 @@ if [ ${#valid_jobs[@]} -gt 0 ]; then
     echo "=== USAGE ==="
     echo "Run all Glide grid jobs sequentially:"
     echo "  source $RUNNER_SCRIPT"
+    echo ""
+    echo "=== GRID EXPORT BEHAVIOR ==="
+    echo "✅ Successful jobs: Grid exported to $GRIDS_DIR, job directory deleted"
+    echo "❌ Failed jobs: Job directory kept in $JOBS_DIR for investigation"
     echo ""
     echo "Note: Use 'source' to ensure proper environment inheritance."
 else
